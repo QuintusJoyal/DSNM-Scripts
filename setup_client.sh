@@ -3,7 +3,7 @@
 # DSNM Client Setup Script
 # Author: 5.H.4.D.0.W
 
-REPO_FILE="/etc/yum.repos.d/dsnm.repo"
+# Client Variables
 REALM="MINIONS.DSNM.SLIIT"
 ADMIN_USER="Administrator"
 ADMIN_PASS="Admin@123"
@@ -22,12 +22,23 @@ if [ "$(id -u)" -ne 0 ]; then
   err "This script must be run as root."
 fi
 
+# Check if OS is Fedora 41
+if [ ! -f /etc/redhat-release ]; then
+  err "This script is intended for Fedora only"
+fi
+
+# Check Fedora version
+if grep -ioqvE 'fedora.*41' /etc/redhat-release; then
+  err "Fedora version is not supported"
+fi
+
 # Disable SELinux (temporary + permanent)
 log "Disabling SELinux..."
 setenforce 0 || err "Failed to disable SELinux temporarily."
 sed -i "/SELINUX=/ s/\(SELINUX=\).*/\1disabled/" /etc/selinux/config || err "Failed to update SELinux config."
 
 # Add Zabbix repository if not present
+REPO_FILE="/etc/yum.repos.d/dsnm.repo"
 log "Setting up repositories..."
 if [ ! -f "$REPO_FILE" ]; then
   cat > "$REPO_FILE" <<EOF

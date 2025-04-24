@@ -3,27 +3,39 @@
 # DHCP Server Setup Script
 # Author: 5.H.4.D.0.W
 
-# Variables
-INTERFACE="enp1s0"  # Interface to listen on
-SUBNET_ADDR="192.168.69.0"  # Subnet address
-SUBNET_MASK="255.255.255.0" # Subnet mask
-ROUTER="192.168.69.1"  # Router address
-BROADCAST_ADDR="192.168.69.255" # Broadcast address
-DHCP_ADDR_RANGE="$ROUTER $BROADCAST_ADDR" # Range of address in dhcp pool
-DOMAIN_NAME="dsnm.sliit" # Domain name
-DOMAIN_NAME_SERVER="$ROUTER" # Domain name server
+# # Variables
+# DHCP_INTERFACE="enp1s0"  # Interface to listen on
+# DHCP_SUBNET_ADDR="192.168.69.0"  # Subnet address
+# DHCP_SUBNET_MASK="255.255.255.0" # Subnet mask
+# DHCP_ROUTER="192.168.69.1"  # Router address
+# DHCP_BROADCAST_ADDR="192.168.69.255" # Broadcast address
+# DHCP_ADDR_RANGE="$DHCP_ROUTER $DHCP_BROADCAST_ADDR" # Range of address in dhcp pool
+# DOMAIN_NAME="dsnm.sliit" # Domain name
+# DOMAIN_NAME_SERVER="$DHCP_ROUTER" # Domain name server
 
-# Color definitions
-RED="\033[0;31m"
-GREEN="\033[0;32m"
-RESET="\033[0m"
+# # Color definitions
+# RED="\033[0;31m"
+# GREEN="\033[0;32m"
+# RESET="\033[0m"
 
-log()    { echo -e "${GREEN}[INFO]${RESET} $1"; }
-err()    { echo -e "${RED}[ERROR]${RESET} $1" >&2; exit 1; }
+# log()    { echo -e "${GREEN}[INFO]${RESET} $1"; }
+# err()    { echo -e "${RED}[ERROR]${RESET} $1" >&2; exit 1; }
+
+log "Staring DHCP server installation..."
 
 # Ensure script is run as root
 if [ "$(id -u)" -ne 0 ]; then
   err "This script must be run as root."
+fi
+
+# Check if OS is Fedora 41
+if [ ! -f /etc/redhat-release ]; then
+  err "This script is intended for Fedora only"
+fi
+
+# Check Fedora version
+if grep -ioqvE 'fedora.*41' /etc/redhat-release; then
+  err "Fedora version is not supported"
 fi
 
 # Install DHCP server package
@@ -43,13 +55,13 @@ authoritative;
 
 log-facility local7;
 
-subnet $SUBNET_ADDR netmask $SUBNET_MASK {
-  interface $INTERFACE;
+subnet $DHCP_SUBNET_ADDR netmask $DHCP_SUBNET_MASK {
+  interface $DHCP_INTERFACE;
   range $DHCP_ADDR_RANGE;
   option domain-name-servers ${DOMAIN_NAME_SERVER};
   option domain-name "$DOMAIN_NAME";
-  option routers $ROUTER;
-  option broadcast-address $BROADCAST_ADDR;
+  option routers $DHCP_ROUTER;
+  option broadcast-address $DHCP_BROADCAST_ADDR;
   default-lease-time 600;
   max-lease-time 7200;
 }

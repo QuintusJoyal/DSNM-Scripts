@@ -3,28 +3,39 @@
 # BIND DNS Server Setup Script
 # Author: 5.H.4.D.0.W
 
-# Variables
-DOMAIN_NAME="dsnm.sliit"
-DNS_SUB_DOMAIN="ns1"
-FORWARD_ZONE="$DOMAIN_NAME"
-REVERSE_ZONE="69.168.192.in-addr.arpa"
-FORWARDERS="8.8.8.8; 8.8.4.4;"
-SERVER_ADDR="192.168.69.1;"
-SERVER_HOST_ID="1"
-MAIL_SERVER_ADDR="$SERVER_ADDR"
-ALLOW_QUERY="192.168.69.0/24;"
+# # Variables
+# DOMAIN_NAME="dsnm.sliit"
+# DNS_SUB_DOMAIN="ns1"
+# DNS_FORWARD_ZONE="$DOMAIN_NAME"
+# DNS_REVERSE_ZONE="69.168.192.in-addr.arpa"
+# DNS_FORWARDERS="8.8.8.8; 8.8.4.4;"
+# DNS_SERVER_ADDR="192.168.69.1;"
+# DNS_SERVER_HOST_ID="1"
+# DNS_ALLOW_QUERY="192.168.69.0/24;"
 
-# Color definitions
-RED="\033[0;31m"
-GREEN="\033[0;32m"
-RESET="\033[0m"
+# # Color definitions
+# RED="\033[0;31m"
+# GREEN="\033[0;32m"
+# RESET="\033[0m"
 
-log()    { echo -e "${GREEN}[INFO]${RESET} $1"; }
-err()    { echo -e "${RED}[ERROR]${RESET} $1" >&2; exit 1; }
+# log()    { echo -e "${GREEN}[INFO]${RESET} $1"; }
+# err()    { echo -e "${RED}[ERROR]${RESET} $1" >&2; exit 1; }
+
+log "Starting named server installation..."
 
 # Ensure script is run as root
 if [ "$(id -u)" -ne 0 ]; then
   err "This script must be run as root."
+fi
+
+# Check if OS is Fedora 41
+if [ ! -f /etc/redhat-release ]; then
+  err "This script is intended for Fedora only"
+fi
+
+# Check Fedora version
+if grep -ioqvE 'fedora.*41' /etc/redhat-release; then
+  err "Fedora version is not supported"
 fi
 
 # Install BIND DNS server package
@@ -41,7 +52,7 @@ fi
 log "Configuring /etc/named.conf..."
 cat > /etc/named.conf <<EOF
 options {
-        listen-on port 53 { $SERVER_ADDR };
+        listen-on port 53 { $DNS_SERVER_ADDR };
 
         directory       "/var/named";
         dump-file       "/var/named/data/cache_dump.db";
@@ -49,10 +60,10 @@ options {
         memstatistics-file "/var/named/data/named_mem_stats.txt";
         recursing-file  "/var/named/data/named.recursing";
         secroots-file   "/var/named/data/named.secroots";
-        allow-query     { $ALLOW_QUERY };
+        allow-query     { $DNS_ALLOW_QUERY };
 
         recursion yes;
-        forwarders { $FORWARDERS };
+        forwarders { $DNS_FORWARDERS };
         forward only;
 
         dnssec-validation yes;
@@ -71,17 +82,17 @@ logging {
         };
 };
 
-zone "$FORWARD_ZONE" {
+zone "$DNS_FORWARD_ZONE" {
         type master;
         file "$DOMAIN_NAME.zone";
-        allow-query { $ALLOW_QUERY };
+        allow-query { $DNS_ALLOW_QUERY };
         notify yes;
 };
 
-zone "$REVERSE_ZONE" IN {
+zone "$DNS_REVERSE_ZONE" IN {
         type master;
         file "$DOMAIN_NAME.rzone";
-        allow-query { $ALLOW_QUERY };
+        allow-query { $DNS_ALLOW_QUERY };
         notify yes;
 };
 
@@ -109,12 +120,10 @@ if [ ! -f "$FORWARD_FILE" ]; then
                         1D )
 
 @       IN      NS      $DNS_SUB_DOMAIN.$DOMAIN_NAME.
-@       IN      MX      10 mail.$DOMAIN_NAME.
 @       IN      TXT     "DSNM Assignment Server"
-@       IN      A       $SERVER_ADDR
-mail    IN      A       $MAIL_SERVER_ADDR
-www     IN      A       $SERVER_ADDR
-$DNS_SUB_DOMAIN     IN      A       $SERVER_ADDR
+@       IN      A       $DNS_SERVER_ADDR
+www     IN      A       $DNS_SERVER_ADDR
+$DNS_SUB_DOMAIN     IN      A       $DNS_SERVER_ADDR
 EOF
 else
   log "Forward zone file already exists. Skipping creation."
@@ -125,7 +134,7 @@ REVERSE_FILE="/var/named/${DOMAIN_NAME}.rzone"
 if [ ! -f "$REVERSE_FILE" ]; then
   log "Creating reverse zone file for $DOMAIN_NAME..."
   cat > "$REVERSE_FILE" <<EOF
-\$ORIGIN $REVERSE_ZONE.
+\$ORIGIN $DNS_REVERSE_ZONE.
 \$TTL 3D
 @       IN      SOA     $DNS_SUB_DOMAIN.$DOMAIN_NAME. root.$DOMAIN_NAME. (
                         20240401
@@ -134,7 +143,7 @@ if [ ! -f "$REVERSE_FILE" ]; then
                         4W
                         1D )
 @       IN      NS      $DNS_SUB_DOMAIN.$DOMAIN_NAME.
-$SERVER_HOST_ID      IN      PTR     $DOMAIN_NAME.
+$DNS_SERVER_HOST_ID      IN      PTR     $DOMAIN_NAME.
 EOF
 else
   log "Reverse zone file already exists. Skipping creation."

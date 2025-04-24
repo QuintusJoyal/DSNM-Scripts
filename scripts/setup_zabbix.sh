@@ -3,23 +3,35 @@
 # Zabbix + PostgreSQL Setup Script
 # Author: 5.H.4.D.0.W
 
-DB_PASS="123456"
-REPO_FILE="/etc/yum.repos.d/dsnm.repo"
+# ZABBIX_DB_PASS="123456"
 
-# Color definitions
-RED="\033[0;31m"
-GREEN="\033[0;32m"
-RESET="\033[0m"
+# # Color definitions
+# RED="\033[0;31m"
+# GREEN="\033[0;32m"
+# RESET="\033[0m"
 
-log()    { echo -e "${GREEN}[INFO]${RESET} $1"; }
-err()    { echo -e "${RED}[ERROR]${RESET} $1" >&2; exit 1; }
+# log()    { echo -e "${GREEN}[INFO]${RESET} $1"; }
+# err()    { echo -e "${RED}[ERROR]${RESET} $1" >&2; exit 1; }
+
+log "Starting Zabbix server installation..."
 
 # Ensure script is run as root
 if [ "$(id -u)" -ne 0 ]; then
   err "This script must be run as root."
 fi
 
+# Check if OS is Fedora 41
+if [ ! -f /etc/redhat-release ]; then
+  err "This script is intended for Fedora only"
+fi
+
+# Check Fedora version
+if grep -ioqvE 'fedora.*41' /etc/redhat-release; then
+  err "Fedora version is not supported"
+fi
+
 # Add repositories if not already present
+REPO_FILE="/etc/yum.repos.d/dsnm.repo"
 log "Setting up repositories..."
 if [ ! -f "$REPO_FILE" ]; then
   cat > "$REPO_FILE" <<EOF
@@ -79,7 +91,7 @@ dnf install -y zabbix-server-pgsql zabbix-web-pgsql zabbix-apache-conf zabbix-sq
 # Create Zabbix DB & user
 log "Creating Zabbix PostgreSQL user and database..."
 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='zabbix'" | grep -q 1 || \
-  sudo -u postgres psql -c "CREATE ROLE zabbix WITH LOGIN PASSWORD '$DB_PASS';"
+  sudo -u postgres psql -c "CREATE ROLE zabbix WITH LOGIN PASSWORD '$ZABBIX_DB_PASS';"
 
 sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw zabbix || \
   sudo -u postgres createdb -O zabbix -E Unicode zabbix
@@ -89,9 +101,9 @@ zcat /usr/share/zabbix/sql-scripts/postgresql/server.sql.gz | sudo -u zabbix psq
 
 # Update Zabbix server config
 CONF_FILE="/etc/zabbix/zabbix_server.conf"
-if ! grep -q "^DBPassword=$DB_PASS" "$CONF_FILE"; then
+if ! grep -q "^DBPassword=$ZABBIX_DB_PASS" "$CONF_FILE"; then
   log "Updating Zabbix server password config..."
-  sed -i "/^# DBPassword=/a DBPassword=$DB_PASS" "$CONF_FILE"
+  sed -i "/^# DBPassword=/a DBPassword=$ZABBIX_DB_PASS" "$CONF_FILE"
 else
   log "Zabbix server DB password already configured."
 fi

@@ -3,25 +3,37 @@
 # Samba AD DC Server Setup Script
 # Author: 5.H.4.D.0.W
 
-# Variables
-DOMAIN="minions"
-REALM="${DOMAIN}.dsnm.sliit"
-ADMIN_PASS="Admin@123"
-USER_NAME="student"
-USER_PASS="Pass@123"
-GROUP_NAME="students"
+# # Variables
+# SAMBA_DOMAIN="minions"
+# SAMBA_REALM="${SAMBA_DOMAIN}.dsnm.sliit"
+# SAMBA_ADMIN_PASS="Admin@123"
+# SAMBA_CLIENT_USER_NAME="student"
+# SAMBA_CLIENT_USER_PASS="Pass@123"
+# SAMBA_CLIENT_GROUP_NAME="students"
 
-# Color definitions
-RED="\033[0;31m"
-GREEN="\033[0;32m"
-RESET="\033[0m"
+# # Color definitions
+# RED="\033[0;31m"
+# GREEN="\033[0;32m"
+# RESET="\033[0m"
 
-log()    { echo -e "${GREEN}[INFO]${RESET} $1"; }
-err()    { echo -e "${RED}[ERROR]${RESET} $1" >&2; exit 1; }
+# log()    { echo -e "${GREEN}[INFO]${RESET} $1"; }
+# err()    { echo -e "${RED}[ERROR]${RESET} $1" >&2; exit 1; }
+
+log "Staring Samba installation..."
 
 # Ensure script is run as root
 if [ "$(id -u)" -ne 0 ]; then
   err "This script must be run as root."
+fi
+
+# Check if OS is Fedora 41
+if [ ! -f /etc/redhat-release ]; then
+  err "This script is intended for Fedora only"
+fi
+
+# Check Fedora version
+if grep -ioqvE 'fedora.*41' /etc/redhat-release; then
+  err "Fedora version is not supported"
 fi
 
 # Disable SELinux (temporary + permanent)
@@ -43,11 +55,11 @@ fi
 log "Provisioning Samba AD domain..."
 samba-tool domain provision \
   --use-rfc2307 \
-  --domain="$DOMAIN" \
-  --realm="$REALM" \
+  --domain="$SAMBA_DOMAIN" \
+  --realm="$SAMBA_REALM" \
   --server-role=dc \
   --dns-backend=BIND9_DLZ \
-  --adminpass="$ADMIN_PASS" || err "Domain provisioning failed."
+  --adminpass="$SAMBA_ADMIN_PASS" || err "Domain provisioning failed."
 
 # Update Kerberos config
 log "Updating Kerberos configuration..."
@@ -90,11 +102,11 @@ systemctl restart named || err "Failed to restart named."
 
 # Create user and group
 log "Creating AD user and group..."
-samba-tool user show "$USER_NAME" >/dev/null 2>&1 || samba-tool user add "$USER_NAME" "$USER_PASS" || err "Failed to add user."
-samba-tool group show "$GROUP_NAME" >/dev/null 2>&1 || samba-tool group add "$GROUP_NAME" || err "Failed to add group."
+samba-tool user show "$SAMBA_CLIENT_USER_NAME" >/dev/null 2>&1 || samba-tool user add "$SAMBA_CLIENT_USER_NAME" "$SAMBA_CLIENT_USER_PASS" || err "Failed to add user."
+samba-tool group show "$SAMBA_CLIENT_GROUP_NAME" >/dev/null 2>&1 || samba-tool group add "$SAMBA_CLIENT_GROUP_NAME" || err "Failed to add group."
 
-if ! samba-tool group listmembers "$GROUP_NAME" | grep -q "^$USER_NAME$"; then
-  samba-tool group addmembers "$GROUP_NAME" "$USER_NAME" || err "Failed to add user to group."
+if ! samba-tool group listmembers "$SAMBA_CLIENT_GROUP_NAME" | grep -q "^$SAMBA_CLIENT_USER_NAME$"; then
+  samba-tool group addmembers "$SAMBA_CLIENT_GROUP_NAME" "$SAMBA_CLIENT_USER_NAME" || err "Failed to add user to group."
 else
   log "User already in group."
 fi
